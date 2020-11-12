@@ -1,12 +1,40 @@
----
+# requires --extra-vars="target='host1;host2;group etc' package='python-tahrir'"
+#
+# Alternatively, you could update a group of packages like
+# --extra-vars="target='host1;host2' package='python-t*'"
+#
+# To update from testing, adjust as follow:
+# --extra-vars="target='host1;host2' package='python-t*' testing=True"
 
-  hosts: all
-  become: yes
+- name: push packages out
+  hosts: "{{target}}"
+  user: lynx
+
+  vars:
+    testing: False
+
   tasks:
-    - dnf:
-      name: '*'
-      state: latest
-      register: dnf_result
 
-    - debug:
-      var: dnf_result
+  - name: yum update {{ package }} from main repo
+    yum: name="{{ package }}" state=latest update_cache=yes
+    when: not testing and ansible_distribution_major_version|int < 8 and ansible_distribution == 'RedHat'
+
+  - name: yum update {{ package }} from testing repo
+    yum: name="{{ package }}" state=latest enablerepo=infrastructure-tags-stg update_cache=yes
+    when: testing and ansible_distribution_major_version|int < 8 and ansible_distribution == 'RedHat'
+
+  - name: dnf clean all (since we can't do it when updating)
+    command: dnf clean all
+    when: not testing and ansible_distribution_major_version|int > 21 and ansible_distribution == 'Fedora'
+
+  - name: dnf update {{ package }} from main repo
+    dnf: name="{{ package }}" state=latest
+    when: not testing and ansible_distribution_major_version|int > 21 and ansible_distribution == 'Fedora'
+
+  - name: dnf clean all (since we can't do it when updating)
+    command: dnf clean all --enablerepo=infrastructure-tags-stg
+    when: testing and ansible_distribution_major_version|int > 21 and ansible_distribution == 'Fedora'
+
+  - name: dnf update {{ package }} from testing repo
+    dnf: name="{{ package }}" state=latest enablerepo=infrastructure-tags-stg
+    when: testing and ansible_distribution_major_version|int > 21 and ansible_distribution == 'Fedora'
