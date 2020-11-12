@@ -1,0 +1,12 @@
+---
+
+  hosts: all
+  become: yes
+  tasks:
+    - dnf:
+      name: '*'
+      state: latest
+      register: dnf_result
+
+    - debug:
+      var: dnf_result
